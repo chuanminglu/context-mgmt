@@ -1,0 +1,75 @@
+
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "生成AI上下文",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/context-generator.py"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "智能上下文检查",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/smart-refresh.py",
+        "--check"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "自动上下文刷新",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/smart-refresh.py",
+        "--auto"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "上下文刷新报告",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/smart-refresh.py",
+        "--report"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "强制上下文刷新",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/smart-refresh.py",
+        "--force"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    }
+  ]
+}

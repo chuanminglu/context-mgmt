@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../taskflow"
+		},
+		{
+			"path": "../taskflow-demo"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"powershell.cwd": "taskflow"
+	}
+}

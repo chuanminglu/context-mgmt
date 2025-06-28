@@ -1,0 +1,30 @@
+{
+  "project": {
+    "name": "context-mgmt",
+    "type": "context-management-system", 
+    "version": "2.0.0",
+    "created": "2025-06-28T20:56:00.000000",
+    "description": "AI上下文管理系统 - 独立版本"
+  },
+  "settings": {
+    "auto_update": true,
+    "session_prefix": "context-mgmt-",
+    "template_version": "2.0",
+    "max_context_length": 15000,
+    "enable_smart_detection": true,
+    "enable_vscode_integration": true
+  },
+  "integrations": {
+    "vscode": true,
+    "git": true,
+    "ci_cd": false,
+    "mcp": false
+  },
+  "features": {
+    "auto_scanning": true,
+    "smart_refresh": true,
+    "multi_format_output": true,
+    "project_detection": true,
+    "backup_system": true
+  }
+}

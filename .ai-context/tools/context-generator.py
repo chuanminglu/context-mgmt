@@ -34,6 +34,50 @@ class ContextGenerator:
         self.project_root = Path(project_root).resolve()  # 确保是绝对路径
         self.ai_context_dir = self.project_root / ".ai-context"
         
+        # 读取扫描配置
+        self.scanning_config = self._load_scanning_config()
+        
+    def _load_scanning_config(self):
+        """加载扫描配置"""
+        # 默认配置
+        default_config = {
+            "max_depth": 3,
+            "include_hidden_dirs": False,
+            "special_include_dirs": [".ai-context"],
+            "exclude_dirs": ["__pycache__", "node_modules", ".git"],
+            "important_extensions": [".py", ".js", ".md", ".json", ".yml", ".yaml", ".sql", ".db", ".html", ".css", ".tsx", ".jsx", ".ts"]
+        }
+        
+        # 读取配置文件
+        config_file = self.ai_context_dir / "context-config.json"
+        if config_file.exists():
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    base_scanning_config = config.get('scanning', {})
+                    
+                    # 合并默认配置
+                    for key, value in default_config.items():
+                        if key not in base_scanning_config:
+                            base_scanning_config[key] = value
+                    
+                    # 检测项目类型并应用特定配置
+                    project_type = config.get('project', {}).get('type', 'general')
+                    project_specific = base_scanning_config.get('project_specific', {})
+                    
+                    if project_type in project_specific:
+                        specific_config = project_specific[project_type]
+                        # 应用项目特定配置
+                        for key, value in specific_config.items():
+                            if key != 'project_specific':  # 避免递归
+                                base_scanning_config[key] = value
+                    
+                    return base_scanning_config
+            except (json.JSONDecodeError, FileNotFoundError):
+                pass
+        
+        return default_config
+    
     def generate_context_summary(self):
         """生成简化的上下文总结"""
         detector = ProjectDetector(str(self.project_root))
@@ -156,10 +200,11 @@ class ContextGenerator:
         """获取重要文件列表"""
         important_files = []
         self._scan_directory(self.project_root, important_files)
-        return "\n".join(important_files[:25]) if important_files else NO_FILES_MSG
+        return "\n".join(important_files[:50]) if important_files else NO_FILES_MSG  # 增加到50个文件
     
-    def _scan_directory(self, path, important_files, prefix="", max_depth=2, current_depth=0):
-        """递归扫描目录结构"""
+    def _scan_directory(self, path, important_files, prefix="", current_depth=0):
+        """递归扫描目录结构（基于配置）"""
+        max_depth = self.scanning_config.get('max_depth', 3)
         if current_depth >= max_depth:
             return
         
@@ -170,29 +215,58 @@ class ContextGenerator:
             
             # 添加重要目录
             for directory in sorted(dirs):
-                important_files.append(f"{prefix}- 📁 {directory.name}/")
-                self._scan_directory(directory, important_files, prefix + "  ", max_depth, current_depth + 1)
+                try:
+                    important_files.append(f"{prefix}- 📁 {directory.name}/")
+                    self._scan_directory(directory, important_files, prefix + "  ", current_depth + 1)
+                except UnicodeError:
+                    # 如果有编码问题，使用纯文本版本
+                    important_files.append(f"{prefix}- [DIR] {directory.name}/")
+                    self._scan_directory(directory, important_files, prefix + "  ", current_depth + 1)
             
             # 添加重要文件
             for file_path in sorted(files):
-                important_files.append(f"{prefix}- 📄 {file_path.name}")
+                try:
+                    important_files.append(f"{prefix}- 📄 {file_path.name}")
+                except UnicodeError:
+                    # 如果有编码问题，使用纯文本版本
+                    important_files.append(f"{prefix}- [FILE] {file_path.name}")
                         
         except PermissionError:
             pass
+        except Exception as e:
+            # 添加通用异常处理以诊断问题
+            important_files.append(f"{prefix}- [ERROR] 扫描 {path.name} 时出错: {e}")
     
     def _is_important_dir(self, directory):
-        """判断是否为重要目录"""
-        # 对于上下文管理系统，.ai-context 是重要目录
-        if directory.name == '.ai-context':
+        """判断是否为重要目录（基于配置）"""
+        include_hidden = self.scanning_config.get('include_hidden_dirs', False)
+        special_include = self.scanning_config.get('special_include_dirs', [])
+        exclude_dirs = self.scanning_config.get('exclude_dirs', [])
+        
+        # 检查是否在排除列表中
+        if directory.name in exclude_dirs:
+            return False
+        
+        # 检查特殊包含目录
+        if directory.name in special_include:
             return True
-        # 其他隐藏目录通常不重要，除了特殊情况
-        return (not directory.name.startswith('.') and 
-                directory.name not in ['__pycache__', 'node_modules', '.git'])
+        
+        # 检查隐藏目录
+        if directory.name.startswith('.'):
+            return include_hidden
+        
+        return True
     
     def _is_important_file(self, file_path):
-        """判断是否为重要文件"""
-        return (not file_path.name.startswith('.') and 
-                file_path.suffix in ['.py', '.js', '.md', '.json', '.yml', '.sql', '.db'])
+        """判断是否为重要文件（基于配置）"""
+        important_extensions = self.scanning_config.get('important_extensions', [])
+        
+        # 跳过隐藏文件（除非配置允许）
+        if file_path.name.startswith('.'):
+            return False
+            
+        # 检查文件扩展名
+        return file_path.suffix.lower() in important_extensions
     
     def _get_recent_changes(self):
         """获取最近变更（改进版）"""
@@ -219,25 +293,41 @@ class ContextGenerator:
         return "\n".join(changes)
     
     def _get_recently_modified_files(self):
-        """获取最近修改的文件列表"""
+        """获取最近修改的文件列表（基于配置）"""
         recent_files = []
-        cutoff_time = datetime.now().timestamp() - (7 * 24 * 3600)  # 7天内
         
-        def check_files(path, max_depth=3, current_depth=0):  # 增加深度到3
+        # 从配置读取参数
+        recent_config = self.scanning_config
+        if 'recent_files' in self.scanning_config:
+            # 如果有专门的 recent_files 配置，优先使用
+            config_file = self.ai_context_dir / "context-config.json"
+            if config_file.exists():
+                try:
+                    with open(config_file, 'r', encoding='utf-8') as f:
+                        full_config = json.load(f)
+                        recent_config = full_config.get('recent_files', self.scanning_config)
+                except:
+                    pass
+        
+        days_threshold = recent_config.get('days_threshold', 7)
+        max_depth = recent_config.get('max_depth', 3)
+        cutoff_time = datetime.now().timestamp() - (days_threshold * 24 * 3600)
+        
+        def check_files(path, current_depth=0):
             if current_depth >= max_depth:
                 return
                 
             try:
                 for item in path.iterdir():
-                    # 跳过大部分隐藏文件和目录，但保留 .ai-context
-                    if item.name.startswith('.') and item.name != '.ai-context':
-                        continue
-                        
-                    if item.is_file() and item.stat().st_mtime > cutoff_time:
-                        rel_path = item.relative_to(self.project_root)
-                        recent_files.append((str(rel_path), item.stat().st_mtime))
-                    elif item.is_dir() and item.name not in ['__pycache__', 'node_modules']:
-                        check_files(item, max_depth, current_depth + 1)
+                    # 使用配置化的目录过滤逻辑
+                    if item.is_dir():
+                        if self._is_important_dir(item):
+                            check_files(item, current_depth + 1)
+                    elif item.is_file() and item.stat().st_mtime > cutoff_time:
+                        # 使用配置化的文件过滤逻辑
+                        if self._is_important_file(item) or not item.name.startswith('.'):
+                            rel_path = item.relative_to(self.project_root)
+                            recent_files.append((str(rel_path), item.stat().st_mtime))
             except PermissionError:
                 pass
         
@@ -415,4 +505,11 @@ class ContextGenerator:
 if __name__ == "__main__":
     generator = ContextGenerator(".")
     summary = generator.generate_context_summary()
-    print(summary)
+    
+    # 处理 Windows 控制台编码问题
+    try:
+        print(summary)
+    except UnicodeEncodeError:
+        # 如果有编码问题，替换有问题的字符
+        safe_summary = summary.replace('📁', '[DIR]').replace('📄', '[FILE]')
+        print(safe_summary)

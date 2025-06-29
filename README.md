@@ -17,6 +17,14 @@
 - **📊 配置化扫描**：支持项目特定的扫描配置
 - **🔄 自动化工作流**：开始/结束会话时自动更新上下文
 - **📝 多格式输出**：支持简洁和详细两种文档格式
+- **🎯 一键部署系统**：`deploy-ai-context.py` 自动创建完整项目结构 ✨
+
+### 🧪 **测试状态**
+- ✅ 部署脚本测试通过 (详见 `DEPLOYMENT-TEST-REPORT.md`)
+- ✅ 项目类型识别准确 (支持Python、Node.js、混合项目)
+- ✅ VS Code任务集成正常
+- ✅ 上下文生成功能稳定
+- ✅ 会话管理系统完整
 
 ### 🔄 **规划中功能**
 - **🧩 VS Code扩展**：图形化界面和增强体验
@@ -24,6 +32,25 @@
 - **📦 CLI工具打包**：独立可安装的命令行工具
 
 ## 🚀 快速开始
+
+### 0. **一键部署** (推荐新用户)
+
+#### 部署到新项目
+```bash
+# 在你的项目目录中运行
+python path/to/deploy-ai-context.py . --force
+
+# 或者为其他项目部署
+python path/to/deploy-ai-context.py /path/to/your-project
+```
+
+#### 部署特性
+- ✅ **自动检测项目类型** (Python/Node.js/混合项目)
+- ✅ **完整目录结构** (templates/docs/tools/cache/sessions/backup)
+- ✅ **7个核心工具** 自动复制到 `.ai-context/tools/`
+- ✅ **VS Code任务集成** 自动创建 `.vscode/tasks.json`
+- ✅ **智能配置文件** 根据项目特征生成 `context-config.json`
+- ✅ **启动模板** 提供项目特定的 `session-starter.md`
 
 ### 1. 基本使用
 

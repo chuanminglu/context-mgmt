@@ -1,4 +1,3 @@
-
 {
   "version": "2.0.0",
   "tasks": [
@@ -70,6 +69,215 @@
         "echo": true,
         "reveal": "always"
       }
+    },
+    {
+      "label": "开始工作会话",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "start",
+        "${input:sessionTitle}",
+        "-d", 
+        "${input:sessionDescription}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "开始工作会话（自定义）",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "start",
+        "${input:sessionTitleCustom}",
+        "-d", 
+        "${input:sessionDescription}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "快速开始：代码重构",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "start",
+        "代码重构",
+        "-d", 
+        "${input:sessionDescription}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "快速开始：功能开发",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "start",
+        "功能开发",
+        "-d", 
+        "${input:sessionDescription}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "快速开始：Bug修复",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "start",
+        "Bug修复",
+        "-d", 
+        "${input:sessionDescription}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "开始工作会话（交互式）",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "start",
+        "-i"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "结束工作会话",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "end"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "结束工作会话（确认）",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "end",
+        "-i"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "查看工作会话",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "list"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "更新会话进展",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "update",
+        "${input:sessionUpdate}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "更新会话进展（交互式）",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".ai-context/tools/session-manager.py",
+        "update",
+        "-i"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "sessionTitle",
+      "description": "工作会话标题",
+      "type": "pickString",
+      "options": [
+        "代码重构",
+        "功能开发", 
+        "Bug修复",
+        "性能优化",
+        "文档更新",
+        "测试编写",
+        "API设计",
+        "数据库优化",
+        "UI/UX改进",
+        "自定义..."
+      ],
+      "default": "代码重构"
+    },
+    {
+      "id": "sessionTitleCustom",
+      "description": "请输入自定义会话标题",
+      "type": "promptString"
+    },
+    {
+      "id": "sessionDescription",
+      "description": "会话详细描述（可选，描述具体要做什么）",
+      "type": "promptString",
+      "default": ""
+    },
+    {
+      "id": "sessionUpdate",
+      "description": "会话进展更新",
+      "type": "promptString"
     }
   ]
 }

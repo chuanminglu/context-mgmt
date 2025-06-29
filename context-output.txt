@@ -1,0 +1,105 @@
+# 项目上下文总结
+生成时间: 2025-06-29 11:47:19
+
+## 项目信息
+- 名称: context-mgmt
+- 类型: context-management-system
+- 技术栈: Python
+- 路径: C:\Programs\ai-contextmgmt-py\context-mgmt
+
+## 核心功能
+1. **自动上下文生成**：智能扫描项目结构和文件内容
+2. **智能刷新机制**：基于文件变更的增量更新
+3. **VS Code集成**：提供任务和扩展支持
+4. **多格式输出**：支持简洁和详细两种文档格式
+5. **缓存优化**：提高大型项目的处理速度
+## 项目结构与重要文件
+- 📁 .ai-context/
+  - 📁 backup/
+    - 📄 context-manager.py
+    - 📄 latest-status.md
+    - 📄 start-session.py
+    - 📄 update-status.py
+  - 📁 cache/
+    - 📄 fix-report.md
+    - 📄 last_refresh.json
+    - 📄 latest-context.md
+  - 📁 docs/
+    - 📄 context-management-guide.md
+    - 📄 project-overview-example.md
+    - 📄 project-overview-template-guide.md
+    - 📄 project-overview-usage.md
+    - 📄 project-overview.md
+    - 📄 refresh-tasks-guide.md
+    - 📄 vscode-extension-development-guide.md
+    - 📄 vscode-extension-implementation-plan.md
+    - 📄 vscode-extension-quickstart.md
+  - 📁 sessions/
+    - 📄 session-20250629-103947.json
+    - 📄 session-20250629-110838.json
+    - 📄 session-20250629-112552.json
+    - 📄 session-20250629-112818.json
+    - 📄 session-20250629-113924.json
+    - 📄 session-20250629-113933.json
+    - 📄 session-20250629-114347.json
+    - 📄 session-20250629-114500.json
+  - 📁 templates/
+    - 📄 project-overview-template.md
+    - 📄 session-starter.md
+  - 📁 tools/
+    - 📄 __init__.py
+    - 📄 auto-refresh-daemon.py
+    - 📄 context-generator.py
+    - 📄 project_detector.py
+    - 📄 session-manager.py
+    - 📄 simplify-system.py
+    - 📄 smart-refresh.py
+  - 📄 context-config.json
+  - 📄 README-detailed.md
+  - 📄 README-simple.md
+  - 📄 README.md
+- 📁 .vscode/
+  - 📄 tasks.json
+- 📄 deploy-ai-context.py
+- 📄 README.md
+## 最近更新
+## 最近修改的文件:
+✅ [会话] 代码重构 (11:45-11:47)
+   📝 重构会话管理的方式，添加详细描述
+   - .ai-context\docs\context-management-guide.md (11:47)
+   - context-output.txt (11:45)
+   - .ai-context\cache\latest-context.md (11:45)
+
+✅ [会话] 代码重构 (11:43-11:45)
+   📝 重构会话管理的方式，添加详细描述
+   - .vscode\tasks.json (11:44)
+
+✅ [会话] API重构优化 (11:39-11:39)
+   📝 优化用户API接口，提高性能和可维护性
+   - .ai-context\sessions\session-20250629-113933.json (11:39)
+
+📄 其他修改:
+- .ai-context\sessions\session-20250629-114500.json (2025-06-29 11:47)
+- .ai-context\sessions\session-20250629-114347.json (2025-06-29 11:45)
+- .ai-context\sessions\session-20250629-113924.json (2025-06-29 11:39)
+- .ai-context\tools\session-manager.py (2025-06-29 11:39)
+- .ai-context\context-config.json (2025-06-29 11:34)
+
+## 项目管理状态
+暂无项目状态记录
+
+## 技术约束
+- 使用Python 3.7+作为核心语言
+- 依赖最小化，优先使用标准库
+- 支持Windows PowerShell和Unix Shell
+- JSON格式配置文件，易于编辑和版本控制
+- Markdown格式输出，便于阅读和集成
+
+## 当前开发状态
+- ✅ 核心工具脚本 (6 个工具)
+- ✅ 配置系统已完成
+- ✅ VS Code任务集成完成
+- ✅ 模板系统已完成
+- ✅ 缓存系统正常运行
+- ✅ 快速部署脚本完成
+- 📚 项目文档 (1 个文档文件)

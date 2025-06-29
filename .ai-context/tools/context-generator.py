@@ -12,6 +12,8 @@ from pathlib import Path
 NO_FEATURES_MSG = "- 暂无功能信息"
 NO_CONSTRAINTS_MSG = "- 暂无约束信息"
 NO_FILES_MSG = "- 暂无识别到重要文件"
+AI_CONTEXT_DIR = ".ai-context"
+CONFIG_FILE_NAME = "context-config.json"
 
 # 添加当前目录到Python路径
 current_dir = Path(__file__).parent
@@ -32,51 +34,56 @@ except ImportError as e:
 class ContextGenerator:
     def __init__(self, project_root):
         self.project_root = Path(project_root).resolve()  # 确保是绝对路径
-        self.ai_context_dir = self.project_root / ".ai-context"
+        self.ai_context_dir = self.project_root / AI_CONTEXT_DIR
         
         # 读取扫描配置
         self.scanning_config = self._load_scanning_config()
         
     def _load_scanning_config(self):
         """加载扫描配置"""
-        # 默认配置
-        default_config = {
+        default_config = self._get_default_scanning_config()
+        
+        config_file = self.ai_context_dir / CONFIG_FILE_NAME
+        if not config_file.exists():
+            return default_config
+        
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return self._merge_scanning_config(default_config, config)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return default_config
+    
+    def _get_default_scanning_config(self):
+        """获取默认扫描配置"""
+        return {
             "max_depth": 3,
             "include_hidden_dirs": False,
-            "special_include_dirs": [".ai-context"],
+            "special_include_dirs": [AI_CONTEXT_DIR],
             "exclude_dirs": ["__pycache__", "node_modules", ".git"],
             "important_extensions": [".py", ".js", ".md", ".json", ".yml", ".yaml", ".sql", ".db", ".html", ".css", ".tsx", ".jsx", ".ts"]
         }
+    
+    def _merge_scanning_config(self, default_config, config):
+        """合并扫描配置"""
+        base_scanning_config = config.get('scanning', {})
         
-        # 读取配置文件
-        config_file = self.ai_context_dir / "context-config.json"
-        if config_file.exists():
-            try:
-                with open(config_file, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    base_scanning_config = config.get('scanning', {})
-                    
-                    # 合并默认配置
-                    for key, value in default_config.items():
-                        if key not in base_scanning_config:
-                            base_scanning_config[key] = value
-                    
-                    # 检测项目类型并应用特定配置
-                    project_type = config.get('project', {}).get('type', 'general')
-                    project_specific = base_scanning_config.get('project_specific', {})
-                    
-                    if project_type in project_specific:
-                        specific_config = project_specific[project_type]
-                        # 应用项目特定配置
-                        for key, value in specific_config.items():
-                            if key != 'project_specific':  # 避免递归
-                                base_scanning_config[key] = value
-                    
-                    return base_scanning_config
-            except (json.JSONDecodeError, FileNotFoundError):
-                pass
+        # 合并默认配置
+        for key, value in default_config.items():
+            if key not in base_scanning_config:
+                base_scanning_config[key] = value
         
-        return default_config
+        # 应用项目特定配置
+        project_type = config.get('project', {}).get('type', 'general')
+        project_specific = base_scanning_config.get('project_specific', {})
+        
+        if project_type in project_specific:
+            specific_config = project_specific[project_type]
+            for key, value in specific_config.items():
+                if key != 'project_specific':  # 避免递归
+                    base_scanning_config[key] = value
+        
+        return base_scanning_config
     
     def generate_context_summary(self):
         """生成简化的上下文总结"""
@@ -110,7 +117,7 @@ class ContextGenerator:
         # 最近更新
         summary.append("## 最近更新")
         recent_files = self._get_recently_modified_files()
-        summary.extend(self._format_recent_files(recent_files))
+        summary.extend(self._format_recent_files_with_sessions(recent_files))
         
         # 项目状态（集成手动状态记录）
         summary.append("")
@@ -141,7 +148,7 @@ class ContextGenerator:
     
     def _read_project_config(self):
         """读取项目配置信息"""
-        config_file = self.ai_context_dir / "context-config.json"
+        config_file = self.ai_context_dir / CONFIG_FILE_NAME
         if config_file.exists():
             try:
                 with open(config_file, 'r', encoding='utf-8') as f:
@@ -294,45 +301,49 @@ class ContextGenerator:
     
     def _get_recently_modified_files(self):
         """获取最近修改的文件列表（基于配置）"""
-        recent_files = []
+        recent_config = self._get_recent_files_config()
+        days_threshold = recent_config.get('days_threshold', 7)
+        max_depth = recent_config.get('max_depth', 3)
+        cutoff_time = datetime.now().timestamp() - (days_threshold * 24 * 3600)
         
-        # 从配置读取参数
+        recent_files = []
+        self._collect_recent_files(self.project_root, recent_files, cutoff_time, max_depth)
+        return sorted(recent_files, key=lambda x: x[1], reverse=True)
+    
+    def _get_recent_files_config(self):
+        """获取最近文件配置"""
         recent_config = self.scanning_config
         if 'recent_files' in self.scanning_config:
-            # 如果有专门的 recent_files 配置，优先使用
-            config_file = self.ai_context_dir / "context-config.json"
+            config_file = self.ai_context_dir / CONFIG_FILE_NAME
             if config_file.exists():
                 try:
                     with open(config_file, 'r', encoding='utf-8') as f:
                         full_config = json.load(f)
                         recent_config = full_config.get('recent_files', self.scanning_config)
-                except:
+                except (json.JSONDecodeError, FileNotFoundError, IOError):
                     pass
-        
-        days_threshold = recent_config.get('days_threshold', 7)
-        max_depth = recent_config.get('max_depth', 3)
-        cutoff_time = datetime.now().timestamp() - (days_threshold * 24 * 3600)
-        
-        def check_files(path, current_depth=0):
-            if current_depth >= max_depth:
-                return
-                
-            try:
-                for item in path.iterdir():
-                    # 使用配置化的目录过滤逻辑
-                    if item.is_dir():
-                        if self._is_important_dir(item):
-                            check_files(item, current_depth + 1)
-                    elif item.is_file() and item.stat().st_mtime > cutoff_time:
-                        # 使用配置化的文件过滤逻辑
-                        if self._is_important_file(item) or not item.name.startswith('.'):
-                            rel_path = item.relative_to(self.project_root)
-                            recent_files.append((str(rel_path), item.stat().st_mtime))
-            except PermissionError:
-                pass
-        
-        check_files(self.project_root)
-        return sorted(recent_files, key=lambda x: x[1], reverse=True)
+        return recent_config
+    
+    def _collect_recent_files(self, path, recent_files, cutoff_time, max_depth, current_depth=0):
+        """递归收集最近修改的文件"""
+        if current_depth >= max_depth:
+            return
+            
+        try:
+            for item in path.iterdir():
+                if item.is_dir() and self._is_important_dir(item):
+                    self._collect_recent_files(item, recent_files, cutoff_time, max_depth, current_depth + 1)
+                elif item.is_file() and self._is_recent_file(item, cutoff_time):
+                    rel_path = item.relative_to(self.project_root)
+                    recent_files.append((str(rel_path), item.stat().st_mtime))
+        except PermissionError:
+            pass
+    
+    def _is_recent_file(self, item, cutoff_time):
+        """判断文件是否为最近修改的文件"""
+        if item.stat().st_mtime <= cutoff_time:
+            return False
+        return self._is_important_file(item) or not item.name.startswith('.')
     
     def _format_recent_files(self, recent_files):
         """格式化最近修改的文件列表"""
@@ -358,113 +369,159 @@ class ContextGenerator:
     
     def _get_development_status(self):
         """获取当前开发状态"""
+        detector = ProjectDetector(str(self.project_root))
+        proj_type, _ = detector.detect_project_type()
+        
         status_info = []
         
-        # 动态检测项目类型并提供相应的状态检查
-        detector = ProjectDetector(str(self.project_root))
-        proj_type, confidence = detector.detect_project_type()
-        
         if proj_type == "context-management-system":
-            # 上下文管理系统的特定状态检查
-            
-            # 检查核心工具脚本
-            tools_dir = self.project_root / ".ai-context" / "tools"
-            if tools_dir.exists():
-                tool_files = list(tools_dir.glob("*.py"))
-                tool_files = [f for f in tool_files if f.name != "__init__.py"]
-                if tool_files:
-                    status_info.append(f"✅ 核心工具脚本 ({len(tool_files)} 个工具)")
-                else:
-                    status_info.append("⏳ 核心工具脚本未完成")
-            else:
-                status_info.append("⏳ 核心工具脚本未开始")
-            
-            # 检查配置文件
-            config_file = self.project_root / ".ai-context" / "context-config.json"
-            if config_file.exists():
-                status_info.append("✅ 配置系统已完成")
-            else:
-                status_info.append("⏳ 配置系统未完成")
-            
-            # 检查VS Code集成
-            vscode_dir = self.project_root / ".vscode"
-            if vscode_dir.exists():
-                tasks_file = vscode_dir / "tasks.json"
-                if tasks_file.exists():
-                    status_info.append("✅ VS Code任务集成完成")
-                else:
-                    status_info.append("⏳ VS Code任务集成未完成")
-            else:
-                status_info.append("⏳ VS Code集成未开始")
-            
-            # 检查模板系统
-            templates_dir = self.project_root / ".ai-context" / "templates"
-            if templates_dir.exists() and list(templates_dir.glob("*.md")):
-                status_info.append("✅ 模板系统已完成")
-            else:
-                status_info.append("⏳ 模板系统未完成")
-            
-            # 检查缓存系统
-            cache_dir = self.project_root / ".ai-context" / "cache"
-            if cache_dir.exists() and list(cache_dir.glob("*.md")):
-                status_info.append("✅ 缓存系统正常运行")
-            else:
-                status_info.append("⏳ 缓存系统未启用")
-            
-            # 检查快速部署脚本
-            deploy_script = self.project_root / "deploy-ai-context.py"
-            if deploy_script.exists():
-                status_info.append("✅ 快速部署脚本完成")
-            else:
-                status_info.append("⏳ 快速部署脚本未完成")
-                
+            status_info.extend(self._check_context_system_status())
         else:
-            # 传统项目结构的检查（保持原有逻辑）
-            
-            # 检查数据库是否存在
-            db_files = list(self.project_root.glob("**/*.db"))
-            if db_files:
-                status_info.append(f"✅ 数据库已创建 ({len(db_files)} 个数据库文件)")
-            else:
-                status_info.append("⏳ 数据库未创建")
-            
-            # 检查后端代码
-            backend_files = list((self.project_root / "backend").glob("**/*.py")) if (self.project_root / "backend").exists() else []
+            status_info.extend(self._check_traditional_project_status())
+        
+        # 通用文档检查
+        self._check_documentation_status(status_info)
+        
+        return "\n".join([f"- {info}" for info in status_info]) or "- 项目刚开始"
+    
+    def _check_context_system_status(self):
+        """检查上下文管理系统状态"""
+        status_info = []
+        
+        # 检查核心工具脚本
+        status_info.append(self._check_tools_status())
+        
+        # 检查配置文件
+        status_info.append(self._check_config_status())
+        
+        # 检查VS Code集成
+        status_info.append(self._check_vscode_integration())
+        
+        # 检查模板系统
+        status_info.append(self._check_templates_status())
+        
+        # 检查缓存系统
+        status_info.append(self._check_cache_status())
+        
+        # 检查快速部署脚本
+        status_info.append(self._check_deploy_script_status())
+        
+        return status_info
+    
+    def _check_tools_status(self):
+        """检查工具脚本状态"""
+        tools_dir = self.project_root / AI_CONTEXT_DIR / "tools"
+        if not tools_dir.exists():
+            return "⏳ 核心工具脚本未开始"
+        
+        tool_files = [f for f in tools_dir.glob("*.py") if f.name != "__init__.py"]
+        if tool_files:
+            return f"✅ 核心工具脚本 ({len(tool_files)} 个工具)"
+        else:
+            return "⏳ 核心工具脚本未完成"
+    
+    def _check_config_status(self):
+        """检查配置文件状态"""
+        config_file = self.project_root / AI_CONTEXT_DIR / CONFIG_FILE_NAME
+        return "✅ 配置系统已完成" if config_file.exists() else "⏳ 配置系统未完成"
+    
+    def _check_vscode_integration(self):
+        """检查VS Code集成状态"""
+        vscode_dir = self.project_root / ".vscode"
+        if not vscode_dir.exists():
+            return "⏳ VS Code集成未开始"
+        
+        tasks_file = vscode_dir / "tasks.json"
+        return "✅ VS Code任务集成完成" if tasks_file.exists() else "⏳ VS Code任务集成未完成"
+    
+    def _check_templates_status(self):
+        """检查模板系统状态"""
+        templates_dir = self.project_root / AI_CONTEXT_DIR / "templates"
+        if templates_dir.exists() and list(templates_dir.glob("*.md")):
+            return "✅ 模板系统已完成"
+        else:
+            return "⏳ 模板系统未完成"
+    
+    def _check_cache_status(self):
+        """检查缓存系统状态"""
+        cache_dir = self.project_root / AI_CONTEXT_DIR / "cache"
+        if cache_dir.exists() and list(cache_dir.glob("*.md")):
+            return "✅ 缓存系统正常运行"
+        else:
+            return "⏳ 缓存系统未启用"
+    
+    def _check_deploy_script_status(self):
+        """检查部署脚本状态"""
+        deploy_script = self.project_root / "deploy-ai-context.py"
+        return "✅ 快速部署脚本完成" if deploy_script.exists() else "⏳ 快速部署脚本未完成"
+    
+    def _check_traditional_project_status(self):
+        """检查传统项目状态"""
+        status_info = []
+        
+        # 检查数据库
+        db_files = list(self.project_root.glob("**/*.db"))
+        if db_files:
+            status_info.append(f"✅ 数据库已创建 ({len(db_files)} 个数据库文件)")
+        else:
+            status_info.append("⏳ 数据库未创建")
+        
+        # 检查后端代码
+        backend_dir = self.project_root / "backend"
+        if backend_dir.exists():
+            backend_files = list(backend_dir.glob("**/*.py"))
             if backend_files:
                 status_info.append(f"🔧 后端开发中 ({len(backend_files)} 个Python文件)")
             else:
                 status_info.append("⏳ 后端代码未开始")
-            
-            # 检查前端代码
-            frontend_files = []
-            if (self.project_root / "frontend").exists():
-                frontend_files.extend(list((self.project_root / "frontend").glob("**/*.html")))
-                frontend_files.extend(list((self.project_root / "frontend").glob("**/*.js")))
-                frontend_files.extend(list((self.project_root / "frontend").glob("**/*.css")))
-            
-            if frontend_files:
-                status_info.append(f"🎨 前端开发中 ({len(frontend_files)} 个前端文件)")
-            else:
-                status_info.append("⏳ 前端代码未开始")
-            
-            # 检查测试代码
-            test_files = list((self.project_root / "tests").glob("**/*.py")) if (self.project_root / "tests").exists() else []
-            if test_files:
-                status_info.append(f"🧪 测试代码 ({len(test_files)} 个测试文件)")
-            else:
-                status_info.append("⏳ 测试代码未编写")
+        else:
+            status_info.append("⏳ 后端代码未开始")
         
-        # 通用文档检查
+        # 检查前端代码
+        frontend_status = self._check_frontend_status()
+        status_info.append(frontend_status)
+        
+        # 检查测试代码
+        test_status = self._check_test_status()
+        status_info.append(test_status)
+        
+        return status_info
+    
+    def _check_frontend_status(self):
+        """检查前端代码状态"""
+        frontend_dir = self.project_root / "frontend"
+        if not frontend_dir.exists():
+            return "⏳ 前端代码未开始"
+        
+        frontend_files = []
+        frontend_files.extend(list(frontend_dir.glob("**/*.html")))
+        frontend_files.extend(list(frontend_dir.glob("**/*.js")))
+        frontend_files.extend(list(frontend_dir.glob("**/*.css")))
+        
+        if frontend_files:
+            return f"🎨 前端开发中 ({len(frontend_files)} 个前端文件)"
+        else:
+            return "⏳ 前端代码未开始"
+    
+    def _check_test_status(self):
+        """检查测试代码状态"""
+        tests_dir = self.project_root / "tests"
+        if tests_dir.exists():
+            test_files = list(tests_dir.glob("**/*.py"))
+            if test_files:
+                return f"🧪 测试代码 ({len(test_files)} 个测试文件)"
+        return "⏳ 测试代码未编写"
+    
+    def _check_documentation_status(self, status_info):
+        """检查文档状态"""
         doc_files = list(self.project_root.glob("**/*.md"))
-        doc_count = len([f for f in doc_files if ".ai-context" not in str(f)])
+        doc_count = len([f for f in doc_files if AI_CONTEXT_DIR not in str(f)])
         if doc_count > 0:
             status_info.append(f"📚 项目文档 ({doc_count} 个文档文件)")
-        
-        return "\n".join([f"- {info}" for info in status_info]) or "- 项目刚开始"
     
     def _get_project_status(self):
         """读取最新的项目状态信息"""
-        status_file = self.project_root / '.ai-context' / 'status' / 'latest-status.md'
+        status_file = self.project_root / AI_CONTEXT_DIR / 'status' / 'latest-status.md'
         
         if not status_file.exists():
             return "暂无项目状态记录"
@@ -501,6 +558,118 @@ class ContextGenerator:
             
         except Exception as e:
             return f"读取项目状态时出错: {e}"
+    
+    def _get_session_context(self):
+        """获取会话上下文信息"""
+        try:
+            # 导入会话管理器
+            session_manager_path = self.ai_context_dir / "tools" / "session-manager.py"
+            if not session_manager_path.exists():
+                return None
+            
+            # 动态导入
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("session_manager", session_manager_path)
+            
+            if spec is None or spec.loader is None:
+                print(f"无法从路径加载模块: {session_manager_path}")
+                return None
+                
+            session_manager_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(session_manager_module)
+            
+            # 创建会话管理器实例
+            manager = session_manager_module.SessionManager(str(self.project_root))
+            
+            # 获取最近的会话
+            recent_sessions = manager.get_recent_sessions(days=7)
+            
+            return recent_sessions
+        except Exception:
+            return None
+    
+    def _format_recent_files_with_sessions(self, recent_files):
+        """格式化最近修改的文件列表，包含会话信息"""
+        session_context = self._get_session_context()
+        
+        if not session_context:
+            return self._format_recent_files(recent_files)
+        
+        changes = ["## 最近修改的文件:"]
+        sessions_by_time, unassigned_files = self._group_files_by_session(recent_files[:10], session_context)
+        
+        # 输出按会话分组的文件
+        self._append_session_files(changes, sessions_by_time)
+        
+        # 输出未分配的文件
+        self._append_unassigned_files(changes, unassigned_files)
+        
+        return changes
+    
+    def _group_files_by_session(self, recent_files, session_context):
+        """按会话分组文件"""
+        sessions_by_time = {}
+        unassigned_files = []
+        
+        for file_path, mtime in recent_files:
+            file_time = datetime.fromtimestamp(mtime)
+            session_key = self._find_file_session(file_time, session_context)
+            
+            if session_key:
+                session = next(s for s in session_context if s["session_id"] == session_key)
+                if session_key not in sessions_by_time:
+                    sessions_by_time[session_key] = {"session": session, "files": []}
+                sessions_by_time[session_key]["files"].append((file_path, mtime))
+            else:
+                unassigned_files.append((file_path, mtime))
+        
+        return sessions_by_time, unassigned_files
+    
+    def _find_file_session(self, file_time, session_context):
+        """查找文件所属的会话"""
+        for session in session_context:
+            start_time = datetime.fromisoformat(session["start_time"])
+            end_time = datetime.fromisoformat(session["end_time"]) if session.get("end_time") else datetime.now()
+            
+            if start_time <= file_time <= end_time:
+                return session["session_id"]
+        return None
+    
+    def _append_session_files(self, changes, sessions_by_time):
+        """添加会话文件到输出"""
+        for session_data in sessions_by_time.values():
+            session = session_data["session"]
+            files = session_data["files"]
+            
+            time_range = self._format_session_time_range(session)
+            status_icon = "🟢" if session["status"] == "active" else "✅"
+            changes.append(f"{status_icon} [会话] {session['title']} ({time_range})")
+            
+            if session.get("description"):
+                changes.append(f"   📝 {session['description']}")
+            
+            for file_path, mtime in sorted(files, key=lambda x: x[1], reverse=True):
+                mod_time = datetime.fromtimestamp(mtime).strftime("%H:%M")
+                changes.append(f"   - {file_path} ({mod_time})")
+            
+            changes.append("")
+    
+    def _format_session_time_range(self, session):
+        """格式化会话时间范围"""
+        start_time = datetime.fromisoformat(session["start_time"]).strftime("%H:%M")
+        if session.get("end_time"):
+            end_time = datetime.fromisoformat(session["end_time"]).strftime("%H:%M")
+            return f"{start_time}-{end_time}"
+        else:
+            return f"{start_time}-(进行中)"
+    
+    def _append_unassigned_files(self, changes, unassigned_files):
+        """添加未分配的文件到输出"""
+        if unassigned_files:
+            changes.append("📄 其他修改:")
+            for file_path, mtime in unassigned_files:
+                mod_time = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                changes.append(f"- {file_path} ({mod_time})")
 
 if __name__ == "__main__":
     generator = ContextGenerator(".")
@@ -510,6 +679,16 @@ if __name__ == "__main__":
     try:
         print(summary)
     except UnicodeEncodeError:
-        # 如果有编码问题，替换有问题的字符
+        # 如果有编码问题，替换所有可能有问题的字符
         safe_summary = summary.replace('📁', '[DIR]').replace('📄', '[FILE]')
-        print(safe_summary)
+        safe_summary = safe_summary.replace('✅', '[OK]').replace('🟢', '[ACTIVE]')
+        safe_summary = safe_summary.replace('📝', '[DESC]').replace('⏱️', '[TIME]')
+        safe_summary = safe_summary.replace('📋', '[LIST]').replace('🏷️', '[TAG]')
+        try:
+            print(safe_summary)
+        except UnicodeEncodeError:
+            # 如果还有问题，输出到文件
+            output_file = "context-output.txt"
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(summary)
+            print(f"上下文已输出到文件: {output_file}")

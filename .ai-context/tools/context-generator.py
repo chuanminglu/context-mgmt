@@ -36,7 +36,7 @@ class ContextGenerator:
         
     def generate_context_summary(self):
         """生成简化的上下文总结"""
-        detector = ProjectDetector(self.project_root)
+        detector = ProjectDetector(str(self.project_root))
         proj_type, _ = detector.detect_project_type()  # 使用下划线忽略未使用的变量
         tech_stack = detector.get_tech_stack()
         
@@ -182,6 +182,10 @@ class ContextGenerator:
     
     def _is_important_dir(self, directory):
         """判断是否为重要目录"""
+        # 对于上下文管理系统，.ai-context 是重要目录
+        if directory.name == '.ai-context':
+            return True
+        # 其他隐藏目录通常不重要，除了特殊情况
         return (not directory.name.startswith('.') and 
                 directory.name not in ['__pycache__', 'node_modules', '.git'])
     
@@ -219,13 +223,14 @@ class ContextGenerator:
         recent_files = []
         cutoff_time = datetime.now().timestamp() - (7 * 24 * 3600)  # 7天内
         
-        def check_files(path, max_depth=2, current_depth=0):
+        def check_files(path, max_depth=3, current_depth=0):  # 增加深度到3
             if current_depth >= max_depth:
                 return
                 
             try:
                 for item in path.iterdir():
-                    if item.name.startswith('.'):
+                    # 跳过大部分隐藏文件和目录，但保留 .ai-context
+                    if item.name.startswith('.') and item.name != '.ai-context':
                         continue
                         
                     if item.is_file() and item.stat().st_mtime > cutoff_time:
@@ -265,40 +270,101 @@ class ContextGenerator:
         """获取当前开发状态"""
         status_info = []
         
-        # 检查数据库是否存在
-        db_files = list(self.project_root.glob("**/*.db"))
-        if db_files:
-            status_info.append(f"✅ 数据库已创建 ({len(db_files)} 个数据库文件)")
+        # 动态检测项目类型并提供相应的状态检查
+        detector = ProjectDetector(str(self.project_root))
+        proj_type, confidence = detector.detect_project_type()
+        
+        if proj_type == "context-management-system":
+            # 上下文管理系统的特定状态检查
+            
+            # 检查核心工具脚本
+            tools_dir = self.project_root / ".ai-context" / "tools"
+            if tools_dir.exists():
+                tool_files = list(tools_dir.glob("*.py"))
+                tool_files = [f for f in tool_files if f.name != "__init__.py"]
+                if tool_files:
+                    status_info.append(f"✅ 核心工具脚本 ({len(tool_files)} 个工具)")
+                else:
+                    status_info.append("⏳ 核心工具脚本未完成")
+            else:
+                status_info.append("⏳ 核心工具脚本未开始")
+            
+            # 检查配置文件
+            config_file = self.project_root / ".ai-context" / "context-config.json"
+            if config_file.exists():
+                status_info.append("✅ 配置系统已完成")
+            else:
+                status_info.append("⏳ 配置系统未完成")
+            
+            # 检查VS Code集成
+            vscode_dir = self.project_root / ".vscode"
+            if vscode_dir.exists():
+                tasks_file = vscode_dir / "tasks.json"
+                if tasks_file.exists():
+                    status_info.append("✅ VS Code任务集成完成")
+                else:
+                    status_info.append("⏳ VS Code任务集成未完成")
+            else:
+                status_info.append("⏳ VS Code集成未开始")
+            
+            # 检查模板系统
+            templates_dir = self.project_root / ".ai-context" / "templates"
+            if templates_dir.exists() and list(templates_dir.glob("*.md")):
+                status_info.append("✅ 模板系统已完成")
+            else:
+                status_info.append("⏳ 模板系统未完成")
+            
+            # 检查缓存系统
+            cache_dir = self.project_root / ".ai-context" / "cache"
+            if cache_dir.exists() and list(cache_dir.glob("*.md")):
+                status_info.append("✅ 缓存系统正常运行")
+            else:
+                status_info.append("⏳ 缓存系统未启用")
+            
+            # 检查快速部署脚本
+            deploy_script = self.project_root / "deploy-ai-context.py"
+            if deploy_script.exists():
+                status_info.append("✅ 快速部署脚本完成")
+            else:
+                status_info.append("⏳ 快速部署脚本未完成")
+                
         else:
-            status_info.append("⏳ 数据库未创建")
+            # 传统项目结构的检查（保持原有逻辑）
+            
+            # 检查数据库是否存在
+            db_files = list(self.project_root.glob("**/*.db"))
+            if db_files:
+                status_info.append(f"✅ 数据库已创建 ({len(db_files)} 个数据库文件)")
+            else:
+                status_info.append("⏳ 数据库未创建")
+            
+            # 检查后端代码
+            backend_files = list((self.project_root / "backend").glob("**/*.py")) if (self.project_root / "backend").exists() else []
+            if backend_files:
+                status_info.append(f"🔧 后端开发中 ({len(backend_files)} 个Python文件)")
+            else:
+                status_info.append("⏳ 后端代码未开始")
+            
+            # 检查前端代码
+            frontend_files = []
+            if (self.project_root / "frontend").exists():
+                frontend_files.extend(list((self.project_root / "frontend").glob("**/*.html")))
+                frontend_files.extend(list((self.project_root / "frontend").glob("**/*.js")))
+                frontend_files.extend(list((self.project_root / "frontend").glob("**/*.css")))
+            
+            if frontend_files:
+                status_info.append(f"🎨 前端开发中 ({len(frontend_files)} 个前端文件)")
+            else:
+                status_info.append("⏳ 前端代码未开始")
+            
+            # 检查测试代码
+            test_files = list((self.project_root / "tests").glob("**/*.py")) if (self.project_root / "tests").exists() else []
+            if test_files:
+                status_info.append(f"🧪 测试代码 ({len(test_files)} 个测试文件)")
+            else:
+                status_info.append("⏳ 测试代码未编写")
         
-        # 检查后端代码
-        backend_files = list((self.project_root / "backend").glob("**/*.py")) if (self.project_root / "backend").exists() else []
-        if backend_files:
-            status_info.append(f"🔧 后端开发中 ({len(backend_files)} 个Python文件)")
-        else:
-            status_info.append("⏳ 后端代码未开始")
-        
-        # 检查前端代码
-        frontend_files = []
-        if (self.project_root / "frontend").exists():
-            frontend_files.extend(list((self.project_root / "frontend").glob("**/*.html")))
-            frontend_files.extend(list((self.project_root / "frontend").glob("**/*.js")))
-            frontend_files.extend(list((self.project_root / "frontend").glob("**/*.css")))
-        
-        if frontend_files:
-            status_info.append(f"🎨 前端开发中 ({len(frontend_files)} 个前端文件)")
-        else:
-            status_info.append("⏳ 前端代码未开始")
-        
-        # 检查测试代码
-        test_files = list((self.project_root / "tests").glob("**/*.py")) if (self.project_root / "tests").exists() else []
-        if test_files:
-            status_info.append(f"🧪 测试代码 ({len(test_files)} 个测试文件)")
-        else:
-            status_info.append("⏳ 测试代码未编写")
-        
-        # 检查文档
+        # 通用文档检查
         doc_files = list(self.project_root.glob("**/*.md"))
         doc_count = len([f for f in doc_files if ".ai-context" not in str(f)])
         if doc_count > 0:

@@ -18,6 +18,10 @@ class ProjectDetector:
         检测项目类型
         返回: (项目类型, 置信度)
         """
+        # 上下文管理系统检测（优先级最高）
+        if self._has_context_management_indicators():
+            return "context-management-system", 0.95
+        
         # Web项目检测
         if self._has_web_indicators():
             return "web_project", 0.9
@@ -177,3 +181,39 @@ class ProjectDetector:
             (self.project_root / "conf.py").exists(),  # Sphinx
         ]
         return any(indicators)
+    
+    def _has_context_management_indicators(self) -> bool:
+        """检测上下文管理系统指标"""
+        # 检查关键目录结构
+        ai_context_dir = self.project_root / ".ai-context"
+        if not ai_context_dir.exists():
+            return False
+        
+        # 检查核心工具目录
+        tools_dir = ai_context_dir / "tools"
+        if not tools_dir.exists():
+            return False
+        
+        # 检查关键工具文件
+        key_tools = [
+            "context-generator.py",
+            "project_detector.py",
+            "smart-refresh.py"
+        ]
+        
+        tool_files_exist = sum(1 for tool in key_tools if (tools_dir / tool).exists())
+        if tool_files_exist < 2:  # 至少存在2个关键工具
+            return False
+        
+        # 检查配置或部署脚本
+        config_indicators = [
+            self.project_root / "deploy-ai-context.py",
+            ai_context_dir / "context-config.json",
+            ai_context_dir / "templates",
+            ai_context_dir / "cache"
+        ]
+        
+        config_exists = sum(1 for indicator in config_indicators if indicator.exists())
+        
+        # 综合判断：工具文件存在 + 配置相关文件存在
+        return config_exists >= 2
